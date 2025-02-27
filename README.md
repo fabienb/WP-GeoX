@@ -11,7 +11,7 @@ Display conditional content based on visitor's location. Works with both Gutenbe
 GeoX allows you to display content conditionally based on the visitor's geographic location. It works seamlessly with both the Gutenberg block editor and the Classic Editor.
 It's a simple and effective alternative to the expensive plugins out there.
 
-**I am happy to release this plugin for FREE. But if this is helpful to you in any way, please consider donating via [Paypal](https://paypal.me/fabienbutazzi) to support this work and future enhancements.**
+**I am happy to release this plugin for FREE. But if this is helpful to you in any way, please consider donating via [Paypal](https://paypal.me/fabienbutazzi) or use the Sponsor links in the sidebar to support this work and future enhancements.**
 
 ### Features
 
