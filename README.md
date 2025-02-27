@@ -52,6 +52,7 @@ _Please make sure you read the API documentation to understand if there is any c
 ### Conditional Content Block (Gutenberg)
 
 Use the GeoX Conditional Container block to wrap content that should only be displayed for specific locations. You can specify both include and exclude criteria in the block settings.
+This works as a container block or wrapper, meaning you can add any other Gutenberg block (or multiple ones) inside GeoX.
 
 ### Conditional Content Shortcode
 
