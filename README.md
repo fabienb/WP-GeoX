@@ -52,17 +52,17 @@ Use the GeoX Conditional Container block to wrap content that should only be dis
 
 Here is an example:
 
-```[geoX include="UK, London, EU" exclude="FR, Berlin"]
-This content will be visible to visitors from the UK, London, or anywhere in Europe, except those from France or Berlin.
+`[geoX include="UK, Tokyo, EU" exclude="FR, Berlin"]
+This content will be visible to visitors from the UK, Tokyo, or anywhere in Europe, except those from France or Berlin.
 [/geoX]
-```
+`
 
 You can also use the shortcode with only include or exclude criteria:
 
-```[geoX exclude="US, CA"]
+`[geoX exclude="US, CA"]
 This content will be visible to visitors from everywhere except the US and Canada.
 [/geoX]
-```
+`
 
 ### Location Information Shortcodes
 
