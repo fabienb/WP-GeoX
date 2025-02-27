@@ -1,5 +1,5 @@
 # These are supported funding model platforms
 
-github: https://github.com/sponsors/fabienb
-ko_fi: https://ko-fi.com/fabienb
-paypal: https://paypal.me/fabienbutazzi
+github: [fabienb]
+ko_fi: [fabienb]
+custom: ["https://paypal.me/fabienbutazzi", paypal]
