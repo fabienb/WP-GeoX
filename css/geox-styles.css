@@ -1,0 +1,10 @@
+.geox-conditional-container,
+.geox-conditional-content {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.geox-conditional-container.geox-visible,
+.geox-conditional-content.geox-visible {
+    opacity: 1;
+}
