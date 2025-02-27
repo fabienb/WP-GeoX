@@ -2,9 +2,8 @@
 
 Display conditional content based on visitor's location. Works with both Gutenberg and Classic Editor.
 
-[![WordPress](https://img.shields.io/wordpress/v/geox.svg)](https://wordpress.org/plugins/geox/)
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D7.0-8892BF.svg)](https://php.net/)
-[![License](https://img.shields.io/badge/License-GPLv2-blue.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
+[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 ## Description
 
