@@ -32,12 +32,23 @@ function geox_register_block_script() {
     wp_register_script(
         'geox-block',
         GEOX_PLUGIN_URL . 'js/geox-block.js',
-        array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components'),
+        array('wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components'),
         GEOX_VERSION,
         true
     );
+    
+    // Explicitly enqueue the script for the block editor
+    if (function_exists('wp_set_script_translations')) {
+        wp_set_script_translations('geox-block', 'geox');
+    }
 }
 add_action('init', 'geox_register_block_script');
+
+// Ensure the block script is enqueued in the editor
+function geox_enqueue_block_editor_assets() {
+    wp_enqueue_script('geox-block');
+}
+add_action('enqueue_block_editor_assets', 'geox_enqueue_block_editor_assets');
 
 function geox_enqueue_scripts() {
     wp_enqueue_script('geox-frontend', GEOX_PLUGIN_URL . 'js/geox-frontend.js', array('jquery'), GEOX_VERSION, true);

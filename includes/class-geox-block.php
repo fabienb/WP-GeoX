@@ -54,6 +54,10 @@ class GeoX_Block {
                     'type' => 'string',
                     'default' => '',
                 ),
+                'exclude' => array(
+                    'type' => 'string',
+                    'default' => '',
+                ),
             ),
         ));
     }

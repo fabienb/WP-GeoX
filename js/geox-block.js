@@ -1,8 +1,19 @@
-(function(blocks, element, editor, components) {
+(function() {
+    // Make sure wp is defined before using it
+    if (typeof wp === 'undefined') {
+        console.error('WordPress API (wp) is not available');
+        return;
+    }
+    
+    var blocks = wp.blocks;
+    var element = wp.element;
+    var blockEditor = wp.blockEditor || wp.editor; // Fallback for backward compatibility
+    var components = wp.components;
+    
     var el = element.createElement;
-    var InnerBlocks = editor.InnerBlocks;
+    var InnerBlocks = blockEditor.InnerBlocks;
     var TextControl = components.TextControl;
-    var InspectorControls = editor.InspectorControls;
+    var InspectorControls = blockEditor.InspectorControls;
     var PanelBody = components.PanelBody;
 
     blocks.registerBlockType('geox/conditional-container', {
@@ -67,9 +78,4 @@
             );
         },
     });
-}(
-    window.wp.blocks,
-    window.wp.element,
-    window.wp.blockEditor,
-    window.wp.components
-));
+})();
