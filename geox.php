@@ -3,7 +3,7 @@
  * Plugin Name: GeoX
  * Plugin URI: https://fabienb.blog/
  * Description: Display conditional content based on visitor's location. Works with Gutenberg and Classic Editor. See README.md for a list of available shortcodes.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Fabien Butazzi (@fabienb)
  * Author URI: https://fabienb.blog/
  * License: GPL v2 or later
