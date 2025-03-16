@@ -1,7 +1,38 @@
 <?php
+/**
+ * GeoX Block Class
+ *
+ * Handles the registration and rendering of the GeoX conditional content block.
+ *
+ * @package GeoX
+ * @since 1.0.0
+ */
+
+/**
+ * Class GeoX_Block
+ *
+ * Manages the Gutenberg block for conditional content display based on geolocation.
+ */
 class GeoX_Block {
+    /**
+     * User location data
+     *
+     * @var array|null
+     */
     private $user_location;
 
+    /**
+     * Cache duration in seconds
+     *
+     * @var int
+     */
+    private const CACHE_DURATION = 3600; // 1 hour
+
+    /**
+     * Continent codes and names
+     *
+     * @var array
+     */
     private $continents = [
         'AF' => 'Africa',
         'AN' => 'Antarctica',
@@ -12,6 +43,11 @@ class GeoX_Block {
         'SA' => 'South America'
     ];
 
+    /**
+     * Mapping of country codes to continent codes
+     *
+     * @var array
+     */
     private $country_to_continent = [
         'AD' => 'EU', 'AE' => 'AS', 'AF' => 'AS', 'AG' => 'NA', 'AI' => 'NA', 'AL' => 'EU', 'AM' => 'AS', 'AO' => 'AF', 'AQ' => 'AN', 'AR' => 'SA',
         'AS' => 'OC', 'AT' => 'EU', 'AU' => 'OC', 'AW' => 'NA', 'AX' => 'EU', 'AZ' => 'AS', 'BA' => 'EU', 'BB' => 'NA', 'BD' => 'AS', 'BE' => 'EU',
@@ -40,11 +76,42 @@ class GeoX_Block {
         'VN' => 'AS', 'VU' => 'OC', 'WF' => 'OC', 'WS' => 'OC', 'YE' => 'AS', 'YT' => 'AF', 'ZA' => 'AF', 'ZM' => 'AF', 'ZW' => 'AF'
     ];
 
+    /**
+     * Alternative country name mappings
+     *
+     * @var array
+     */
+    private $country_name_mappings = [
+        'UK' => 'GB',
+        'UNITED KINGDOM' => 'GB',
+        'GREAT BRITAIN' => 'GB',
+        'ENGLAND' => 'GB',
+        'SCOTLAND' => 'GB',
+        'WALES' => 'GB',
+        'NORTHERN IRELAND' => 'GB',
+        'UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND' => 'GB',
+        'UNITED STATES' => 'US',
+        'UNITED STATES OF AMERICA' => 'US',
+        'HAWAII' => 'US',
+        'UAE' => 'AE',
+        'UNITED ARAB EMIRATES' => 'AE',
+        'EMIRATES' => 'AE',
+        'HOLLAND' => 'NL',
+    ];
+
+    /**
+     * Constructor
+     */
     public function __construct() {
         add_action('init', array($this, 'register_block'));
         $this->user_location = null;
     }
 
+    /**
+     * Register the Gutenberg block
+     *
+     * @return void
+     */
     public function register_block() {
         register_block_type('geox/conditional-container', array(
             'editor_script' => 'geox-block',
@@ -62,9 +129,17 @@ class GeoX_Block {
         ));
     }
 
+    /**
+     * Render the block on the frontend
+     *
+     * @param array  $attributes Block attributes.
+     * @param string $content    Block content.
+     * @return string            Rendered block HTML.
+     */
     public function render_block($attributes, $content) {
-        $include = isset($attributes['include']) ? $attributes['include'] : '';
-        $exclude = isset($attributes['exclude']) ? $attributes['exclude'] : '';
+        $include = $attributes['include'] ?? '';
+        $exclude = $attributes['exclude'] ?? '';
+        
         return sprintf(
             '<div class="geox-conditional-container" style="display:none;" data-include="%s" data-exclude="%s">%s</div>',
             esc_attr($include),
@@ -73,92 +148,217 @@ class GeoX_Block {
         );
     }
 
+    /**
+     * Determine if content should be displayed based on geolocation criteria
+     *
+     * @param string $include Comma-separated list of locations to include.
+     * @param string $exclude Comma-separated list of locations to exclude.
+     * @return bool           Whether the content should be displayed.
+     */
     public function should_display($include, $exclude = '') {
         $user_location = $this->get_user_location();
-
+        
+        // If we couldn't determine the user's location, show the content
         if (!$user_location) {
             return true;
         }
-
-        $include_criteria = array_map('trim', explode(',', $include));
-        $exclude_criteria = array_map('trim', explode(',', $exclude));
-
-        // If there's an exclude list and the user matches any criterion, don't display
-        foreach ($exclude_criteria as $criterion) {
-            if ($this->matches_criterion($user_location, $criterion)) {
-                return false;
-            }
+        
+        // Parse criteria lists
+        $include_criteria = $this->parse_criteria_list($include);
+        $exclude_criteria = $this->parse_criteria_list($exclude);
+        
+        // Check exclusion rules first
+        if ($this->matches_any_criteria($user_location, $exclude_criteria)) {
+            return false;
         }
-
-        // If there's no include list, display (unless excluded above)
+        
+        // If no inclusion rules, show the content
         if (empty($include_criteria)) {
             return true;
         }
-
-        // If there's an include list, the user must match at least one criterion
-        foreach ($include_criteria as $criterion) {
-            if ($this->matches_criterion($user_location, $criterion)) {
+        
+        // Check inclusion rules
+        return $this->matches_any_criteria($user_location, $include_criteria);
+    }
+    
+    /**
+     * Parse a comma-separated list of criteria into an array
+     *
+     * @param string $criteria_list Comma-separated list of criteria.
+     * @return array                Array of trimmed criteria.
+     */
+    private function parse_criteria_list($criteria_list) {
+        if (empty($criteria_list)) {
+            return [];
+        }
+        
+        $criteria = explode(',', $criteria_list);
+        return array_filter(array_map('trim', $criteria));
+    }
+    
+    /**
+     * Check if a location matches any of the given criteria
+     *
+     * @param array $location Location data.
+     * @param array $criteria List of criteria to check.
+     * @return bool           Whether the location matches any criterion.
+     */
+    private function matches_any_criteria($location, $criteria) {
+        if (empty($criteria)) {
+            return false;
+        }
+        
+        foreach ($criteria as $criterion) {
+            if ($this->matches_criterion($location, $criterion)) {
                 return true;
             }
         }
-
+        
         return false;
     }
 
+    /**
+     * Get the user's location data
+     *
+     * @return array|false Location data or false on failure.
+     */
     public function get_user_location() {
+        // Return cached location if available
         if ($this->user_location !== null) {
             return $this->user_location;
         }
 
-        $cache_key = 'geox_user_location_' . $this->get_user_ip();
-        $cached_location = get_transient($cache_key);
-
-        if ($cached_location !== false) {
-            $this->user_location = $cached_location;
+        // Try to get location from cache
+        $this->user_location = $this->get_cached_location();
+        if ($this->user_location) {
             return $this->user_location;
         }
 
+        // Try to get location from Google Maps API
+        $this->user_location = $this->get_location_from_primary_source();
+        if ($this->user_location) {
+            return $this->user_location;
+        }
+
+        // Try fallback geolocation
+        $this->user_location = $this->fallback_geolocation();
+        return $this->user_location;
+    }
+    
+    /**
+     * Get cached location data
+     *
+     * @return array|false Location data or false if not cached.
+     */
+    private function get_cached_location() {
+        $cache_key = 'geox_user_location_' . $this->get_user_ip();
+        return get_transient($cache_key);
+    }
+    
+    /**
+     * Get location from primary source (Google Maps API)
+     *
+     * @return array|false Location data or false on failure.
+     */
+    private function get_location_from_primary_source() {
         $api_key = get_option('geox_google_maps_api_key');
         if (!$api_key) {
-            return $this->fallback_geolocation();
+            return false;
         }
+        
+        $location_data = $this->get_location_from_google_api($api_key);
+        if (!$location_data) {
+            return false;
+        }
+        
+        // Cache the location data
+        $cache_key = 'geox_user_location_' . $this->get_user_ip();
+        set_transient($cache_key, $location_data, self::CACHE_DURATION);
+        
+        return $location_data;
+    }
 
-        $ip_address = $this->get_user_ip();
+    /**
+     * Get location data from Google Maps API
+     *
+     * @param string $api_key Google Maps API key.
+     * @return array|false    Location data or false on failure.
+     */
+    private function get_location_from_google_api($api_key) {
+        $coordinates = $this->get_coordinates_from_google($api_key);
+        if (!$coordinates) {
+            return false;
+        }
+        
+        return $this->get_address_from_coordinates(
+            $coordinates['lat'],
+            $coordinates['lng'],
+            $api_key
+        );
+    }
+    
+    /**
+     * Get coordinates from Google Geolocation API
+     *
+     * @param string $api_key Google Maps API key.
+     * @return array|false    Coordinates or false on failure.
+     */
+    private function get_coordinates_from_google($api_key) {
         $url = "https://www.googleapis.com/geolocation/v1/geolocate?key={$api_key}";
-
         $response = wp_remote_post($url, [
+            'timeout' => 10,
             'body' => json_encode(['considerIp' => true])
         ]);
-
+        
         if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-            return $this->fallback_geolocation();
+            return false;
         }
-
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
+        
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        
         if (!isset($data['location']['lat']) || !isset($data['location']['lng'])) {
-            return $this->fallback_geolocation();
+            return false;
         }
+        
+        return [
+            'lat' => $data['location']['lat'],
+            'lng' => $data['location']['lng']
+        ];
+    }
 
-        $lat = $data['location']['lat'];
-        $lng = $data['location']['lng'];
+    /**
+     * Get address details from coordinates using Google Maps Geocoding API
+     *
+     * @param float  $lat     Latitude.
+     * @param float  $lng     Longitude.
+     * @param string $api_key Google Maps API key.
+     * @return array|false    Location data or false on failure.
+     */
+    private function get_address_from_coordinates($lat, $lng, $api_key) {
         $geocode_url = "https://maps.googleapis.com/maps/api/geocode/json?latlng={$lat},{$lng}&key={$api_key}";
-
-        $geocode_response = wp_remote_get($geocode_url);
-
+        $geocode_response = wp_remote_get($geocode_url, ['timeout' => 10]);
+        
         if (is_wp_error($geocode_response) || wp_remote_retrieve_response_code($geocode_response) !== 200) {
-            return $this->fallback_geolocation();
+            return false;
         }
-
-        $geocode_body = wp_remote_retrieve_body($geocode_response);
-        $geocode_data = json_decode($geocode_body, true);
-
+        
+        $geocode_data = json_decode(wp_remote_retrieve_body($geocode_response), true);
+        
         if (!isset($geocode_data['results'][0]['address_components'])) {
-            return $this->fallback_geolocation();
+            return false;
         }
-
-        $this->user_location = [
+        
+        return $this->extract_location_from_components($geocode_data['results'][0]['address_components']);
+    }
+    
+    /**
+     * Extract location data from address components
+     *
+     * @param array $components Address components from geocoding API.
+     * @return array            Location data.
+     */
+    private function extract_location_from_components($components) {
+        $location = [
             'country' => '',
             'country_name' => '',
             'region' => '',
@@ -166,129 +366,244 @@ class GeoX_Block {
             'continent' => '',
             'continent_code' => ''
         ];
-
-        foreach ($geocode_data['results'][0]['address_components'] as $component) {
-            if (in_array('country', $component['types'])) {
-                $this->user_location['country'] = $component['short_name'];
-                $this->user_location['country_name'] = $component['long_name'];
-                $this->user_location['continent_code'] = $this->get_continent_code($component['short_name']);
-                $this->user_location['continent'] = $this->continents[$this->user_location['continent_code']] ?? '';
-            }
-            if (in_array('administrative_area_level_1', $component['types'])) {
-                $this->user_location['region'] = $component['long_name'];
-            }
-            if (in_array('locality', $component['types'])) {
-                $this->user_location['city'] = $component['long_name'];
-            }
+        
+        foreach ($components as $component) {
+            $this->process_address_component($location, $component);
         }
-
-        set_transient($cache_key, $this->user_location, HOUR_IN_SECONDS);
-
-        return $this->user_location;
+        
+        return $location;
+    }
+    
+    /**
+     * Process a single address component and update location data
+     *
+     * @param array $location  Location data to update (passed by reference).
+     * @param array $component Address component from geocoding API.
+     * @return void
+     */
+    private function process_address_component(&$location, $component) {
+        $types = $component['types'];
+        
+        if (in_array('country', $types)) {
+            $location['country'] = $component['short_name'];
+            $location['country_name'] = $component['long_name'];
+            $location['continent_code'] = $this->get_continent_code($component['short_name']);
+            $location['continent'] = $this->continents[$location['continent_code']] ?? '';
+        } elseif (in_array('administrative_area_level_1', $types)) {
+            $location['region'] = $component['long_name'];
+        } elseif (in_array('locality', $types)) {
+            $location['city'] = $component['long_name'];
+        }
     }
 
+    /**
+     * Get continent code from country code
+     *
+     * @param string $country_code Two-letter country code.
+     * @return string              Continent code or empty string if not found.
+     */
     private function get_continent_code($country_code) {
         return $this->country_to_continent[$country_code] ?? '';
     }
 
-    private function get_country_code_3($country_code_2) {
-        $country_codes = [
-            'US' => 'USA', 'GB' => 'GBR', 'CA' => 'CAN', 'AU' => 'AUS', 'IT' => 'ITA',
-            'IE' => 'IRL', 'CN' => 'CHN', 'JP' => 'JPN', 'FR' => 'FRA', 'ES' => 'ESP',
-            'DE' => 'DEU', 'NL' => 'NLD', 'BE' => 'BEL', 'SE' => 'SWE', 'NO' => 'NOR',
-            'DK' => 'DNK', 'FI' => 'FIN', 'PT' => 'PRT', 'GR' => 'GRC', 'AT' => 'AUT',
-            'CH' => 'CHE', 'PL' => 'POL', 'HU' => 'HUN', 'CZ' => 'CZE', 'RO' => 'ROU',
-            'BG' => 'BGR', 'HR' => 'HRV', 'RS' => 'SRB', 'SK' => 'SVK', 'SI' => 'SVN',
-            'EE' => 'EST', 'LV' => 'LVA', 'LT' => 'LTU', 'UA' => 'UKR', 'BY' => 'BLR',
-            'RU' => 'RUS', 'KZ' => 'KAZ', 'IN' => 'IND', 'PK' => 'PAK', 'BD' => 'BGD',
-            'TH' => 'THA', 'VN' => 'VNM', 'ID' => 'IDN', 'MY' => 'MYS', 'PH' => 'PHL',
-            'SG' => 'SGP', 'KR' => 'KOR', 'BR' => 'BRA', 'AR' => 'ARG', 'CL' => 'CHL',
-            'CO' => 'COL', 'PE' => 'PER', 'VE' => 'VEN', 'MX' => 'MEX', 'ZA' => 'ZAF',
-            'EG' => 'EGY', 'MA' => 'MAR', 'NG' => 'NGA', 'KE' => 'KEN', 'IL' => 'ISR',
-            'SA' => 'SAU', 'AE' => 'ARE', 'TR' => 'TUR', 'IR' => 'IRN', 'PL' => 'POL',
-            'NZ' => 'NZL'
-        ];
-        return isset($country_codes[$country_code_2]) ? $country_codes[$country_code_2] : '';
-    }
-
+    /**
+     * Fallback geolocation using ipapi.co
+     *
+     * @return array|false Location data or false on failure.
+     */
     private function fallback_geolocation() {
         $ip_address = $this->get_user_ip();
         $url = "https://ipapi.co/{$ip_address}/json/";
-
-        $response = wp_remote_get($url);
-
+        $response = wp_remote_get($url, ['timeout' => 10]);
+        
         if (is_wp_error($response)) {
             error_log(sprintf('GeoX Fallback Geolocation Error: %s', $response->get_error_message()));
             return false;
         }
-
-        $response_code = wp_remote_retrieve_response_code($response);
-        if ($response_code !== 200) {
-            error_log(sprintf('GeoX Fallback Geolocation HTTP Error: %d', $response_code));
+        
+        if (wp_remote_retrieve_response_code($response) !== 200) {
             return false;
         }
-
-        $body = wp_remote_retrieve_body($response);
-        $data = json_decode($body, true);
-
+        
+        $data = json_decode(wp_remote_retrieve_body($response), true);
+        
         if (!is_array($data) || isset($data['error'])) {
             return false;
         }
-
-        $this->user_location = [
-            'country' => isset($data['country']) ? $data['country'] : '',
-            'country_name' => isset($data['country_name']) ? $data['country_name'] : '',
-            'region' => isset($data['region']) ? $data['region'] : '',
-            'city' => isset($data['city']) ? $data['city'] : '',
-            'continent_code' => $this->get_continent_code($data['country'] ?? ''),
-            'continent' => '',
+        
+        $location = $this->create_location_from_ipapi($data);
+        
+        // Cache the location data
+        $cache_key = 'geox_user_location_' . $ip_address;
+        set_transient($cache_key, $location, self::CACHE_DURATION);
+        
+        return $location;
+    }
+    
+    /**
+     * Create location data from ipapi.co response
+     *
+     * @param array $data API response data.
+     * @return array      Location data.
+     */
+    private function create_location_from_ipapi($data) {
+        $location = [
+            'country' => $data['country'] ?? '',
+            'country_name' => $data['country_name'] ?? '',
+            'region' => $data['region'] ?? '',
+            'city' => $data['city'] ?? '',
+            'continent_code' => '',
+            'continent' => ''
         ];
-
-        if ($this->user_location['continent_code']) {
-            $this->user_location['continent'] = $this->continents[$this->user_location['continent_code']] ?? '';
+        
+        if (!empty($location['country'])) {
+            $location['continent_code'] = $this->get_continent_code($location['country']);
+            $location['continent'] = $this->continents[$location['continent_code']] ?? '';
         }
-
-        return $this->user_location;
+        
+        return $location;
     }
 
+    /**
+     * Check if a user location matches a criterion
+     *
+     * @param array  $user_location User location data.
+     * @param string $criterion     Location criterion to check.
+     * @return bool                 Whether the location matches the criterion.
+     */
     private function matches_criterion($user_location, $criterion) {
-        $criterion = strtoupper(trim($criterion));
-
-        $country_codes = [
-            'UK' => 'GB',
-            'UNITED KINGDOM' => 'GB',
-            'GREAT BRITAIN' => 'GB',
-            'ENGLAND' => 'GB',
-            'SCOTLAND' => 'GB',
-            'WALES' => 'GB',
-            'NORTHERN IRELAND' => 'GB',
-            'UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND' => 'GB',
-            'UNITED STATES' => 'US',
-            'UNITED STATES OF AMERICA' => 'US',
-            'HAWAII' => 'US',
-            'UAE' => 'AE',
-            'UNITED ARAB EMIRATES' => 'AE',
-            'EMIRATES' => 'AE',
-            'HOLLAND' => 'NL',
-            // Add more as needed
-        ];
-
-        if (strlen($criterion) == 2 || isset($country_codes[$criterion])) {
-            $country_code = isset($country_codes[$criterion]) ? $country_codes[$criterion] : $criterion;
-            return strtoupper($user_location['country']) == $country_code;
+        if (empty($criterion) || empty($user_location)) {
+            return false;
         }
-
-        return strtoupper($user_location['city']) == $criterion;
+        
+        $criterion = strtoupper(trim($criterion));
+        
+        // Try different matching strategies in order
+        return $this->is_country_match($user_location, $criterion)
+            || $this->is_continent_match($user_location, $criterion)
+            || $this->is_city_match($user_location, $criterion);
+    }
+    
+    /**
+     * Check if criterion matches a country
+     *
+     * @param array  $location  User location data.
+     * @param string $criterion Location criterion to check.
+     * @return bool             Whether it's a country match.
+     */
+    private function is_country_match($location, $criterion) {
+        // Check if it's a country code or alternative country name
+        if (strlen($criterion) == 2 || isset($this->country_name_mappings[$criterion])) {
+            $country_code = $this->country_name_mappings[$criterion] ?? $criterion;
+            return strtoupper($location['country']) == $country_code;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if criterion matches a continent
+     *
+     * @param array  $location  User location data.
+     * @param string $criterion Location criterion to check.
+     * @return bool             Whether it's a continent match.
+     */
+    private function is_continent_match($location, $criterion) {
+        // Check if it's a continent code
+        if (isset($this->continents[$criterion])) {
+            return $location['continent_code'] == $criterion;
+        }
+        
+        // Check if it's a continent name
+        $continent_code = array_search($criterion, $this->continents);
+        if ($continent_code !== false) {
+            return $location['continent_code'] == $continent_code;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if criterion matches a city
+     *
+     * @param array  $location  User location data.
+     * @param string $criterion Location criterion to check.
+     * @return bool             Whether it's a city match.
+     */
+    private function is_city_match($location, $criterion) {
+        return strtoupper($location['city']) == $criterion;
     }
 
+    /**
+     * Get the user's IP address
+     *
+     * @return string IP address.
+     */
     private function get_user_ip() {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            $ip = $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-        } else {
-            $ip = $_SERVER['REMOTE_ADDR'];
+        $ip_sources = [
+            'HTTP_CLIENT_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'REMOTE_ADDR'
+        ];
+        
+        foreach ($ip_sources as $source) {
+            $ip = $this->get_valid_ip_from_source($source);
+            if ($ip) {
+                return $ip;
+            }
         }
-        return $ip;
+        
+        return '127.0.0.1'; // Default fallback
+    }
+    
+    /**
+     * Get a valid IP from a server variable source
+     *
+     * @param string $source Server variable name.
+     * @return string|false  IP address or false if not valid.
+     */
+    private function get_valid_ip_from_source($source) {
+        if (empty($_SERVER[$source])) {
+            return false;
+        }
+        
+        // Handle comma-separated list of IPs
+        if ($source === 'HTTP_X_FORWARDED_FOR') {
+            return $this->get_first_valid_ip(explode(',', $_SERVER[$source]));
+        }
+        
+        return $this->validate_ip($_SERVER[$source]) ? $_SERVER[$source] : false;
+    }
+    
+    /**
+     * Get the first valid IP from a list
+     *
+     * @param array $ip_list List of IP addresses.
+     * @return string|false  First valid IP or false if none valid.
+     */
+    private function get_first_valid_ip($ip_list) {
+        foreach ($ip_list as $ip) {
+            $ip = trim($ip);
+            if ($this->validate_ip($ip)) {
+                return $ip;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Validate an IP address
+     *
+     * @param string $ip IP address to validate.
+     * @return bool      Whether the IP is valid.
+     */
+    private function validate_ip($ip) {
+        return filter_var($ip, FILTER_VALIDATE_IP, 
+            FILTER_FLAG_IPV4 | 
+            FILTER_FLAG_IPV6 | 
+            FILTER_FLAG_NO_PRIV_RANGE | 
+            FILTER_FLAG_NO_RES_RANGE
+        ) !== false;
     }
 }
