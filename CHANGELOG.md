@@ -1,5 +1,8 @@
 # Changelog
 
+### [1.1.2] - 2025-03-16
+- Reduced overall code complexity and achieved code health 10/10.
+
 ## [1.1.1] - 2025-02-26
 - Improved error handling for both WP_Error cases and non-200 HTTP response codes.
 

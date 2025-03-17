@@ -84,6 +84,9 @@ If you need to display your visitor's information within the content, you can us
 
 ## Changelog
 
+### 1.1.2
+- Reduced overall code complexity and achieved code health 10/10
+
 ### 1.1.1
 - Improved error handling for both WP_Error cases and non-200 HTTP response codes
 
